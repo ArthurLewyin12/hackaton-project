@@ -14,15 +14,19 @@ import (
 	pb "healthsync/go_server/proto"
 )
 
-// gRPCClient est une structure pour contenir notre client gRPC.
-// Cela nous permet de le rendre disponible pour le handler de l'outil.
-type gRPCClient struct {
-	client pb.SymptomAnalysisServiceClient
-}
-
 // analyzeSymptomsHandler est la fonction qui sera exécutée lorsque le LLM appelle notre outil.
-func (c *gRPCClient) analyzeSymptomsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// 1. Récupérer le paramètre "text" de la requête de l'outil
+func analyzeSymptomsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// --- Connexion gRPC ---
+	grpcAddr := "localhost:50051"
+	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Printf("[gRPC Client] Erreur de connexion : %v", err)
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	defer conn.Close()
+	c := pb.NewSymptomAnalysisServiceClient(conn)
+
+	// 1. Récupérer le paramètre "text"
 	text, err := request.RequireString("text")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -30,8 +34,8 @@ func (c *gRPCClient) analyzeSymptomsHandler(ctx context.Context, request mcp.Cal
 
 	log.Printf("[MCP Tool] Appel de l'outil avec le texte : %s", text)
 
-	// 2. Appeler le serveur Python via gRPC
-	r, err := c.client.Analyze(ctx, &pb.SymptomAnalysisRequest{Text: text})
+	// 2. Appeler le serveur Python
+	r, err := c.Analyze(ctx, &pb.SymptomAnalysisRequest{Text: text})
 	if err != nil {
 		log.Printf("[gRPC Client] Erreur lors de l'appel à Analyze : %v", err)
 		return mcp.NewToolResultError(err.Error()), nil
@@ -40,12 +44,13 @@ func (c *gRPCClient) analyzeSymptomsHandler(ctx context.Context, request mcp.Cal
 	symptoms := r.GetSymptoms()
 	log.Printf("[gRPC Client] Réponse reçue du service NLP : %v", symptoms)
 
-	// 3. Sérialiser la réponse en JSON pour la renvoyer au LLM
+	// 3. Sérialiser la réponse en JSON
 	jsonData, err := json.Marshal(symptoms)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	// 4. Construire la réponse de l'outil
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.NewTextContent(string(jsonData)),
@@ -54,43 +59,19 @@ func (c *gRPCClient) analyzeSymptomsHandler(ctx context.Context, request mcp.Cal
 }
 
 func main() {
-	// --- Configuration du client gRPC vers le service Python ---
-	grpcAddr := "localhost:50051"
-	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("Impossible de se connecter au serveur gRPC : %v", err)
-	}
-	defer conn.Close()
-
-	// Créer une instance de notre client gRPC
-	grpcClient := &gRPCClient{
-		client: pb.NewSymptomAnalysisServiceClient(conn),
-	}
-
-	// --- Configuration du serveur MCP ---
-	// 1. Créer le serveur MCP
-	s := server.NewMCPServer(
-		"HealthSync MCP Server",
-		"1.0.0",
-	)
-
-	// 2. Définir le schéma de notre outil
+	// 1. Créer le serveur MCP logique
+	mcpServer := server.NewMCPServer("HealthSync MCP Server", "1.0.0")
 	analyzeTool := mcp.NewTool("analyzeSymptoms",
 		mcp.WithDescription("Extrait des informations structurées sur les symptômes à partir d'un texte brut."),
-		mcp.WithString("text",
-			mcp.Required(),
-			mcp.Description("Le texte brut décrivant les symptômes du patient."),
-		),
+		mcp.WithString("text", mcp.Required(), mcp.Description("Le texte brut décrivant les symptômes du patient.")),
 	)
+	mcpServer.AddTool(analyzeTool, analyzeSymptomsHandler)
 
-	// 3. Ajouter l'outil et son handler au serveur
-	s.AddTool(analyzeTool, grpcClient.analyzeSymptomsHandler)
-
-	// 4. Démarrer le serveur MCP sur stdio
-	log.Println("Serveur MCP démarré sur stdio")
-
-	// démarrer le serveur MCP sur stdio
-	if err := server.ServeStdio(s); err != nil {
-		log.Fatalf("Erreur lors du démarrage du serveur MCP: %v", err)
-	}
+	// 2. Démarrer le serveur en utilisant la méthode StreamableHTTP de la documentation
+	port := ":8090"
+	log.Printf("Serveur MCP démarré sur http://localhost%s", port)
+	httpServer := server.NewStreamableHTTPServer(mcpServer)
+    if err := httpServer.Start(port); err != nil {
+        log.Fatal(err)
+    }
 }
