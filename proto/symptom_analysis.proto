@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "gemini_api_test/proto";
+
+// Le service qui analyse le texte des symptômes
+service SymptomAnalysisService {
+  // Méthode pour analyser le texte et extraire les symptômes
+  rpc Analyze(SymptomAnalysisRequest) returns (SymptomAnalysisResponse) {}
+}
+
+// Message de requête contenant le texte brut de l'utilisateur
+message SymptomAnalysisRequest {
+  string text = 1;
+}
+
+// Représentation structurée d'un symptôme identifié
+message Symptom {
+  string name = 1;        // Ex: "mal de tête", "fièvre"
+  string duration = 2;    // Ex: "3 jours", "ce matin"
+  string intensity = 3;   // Ex: "aigu", "léger"
+}
+
+// Message de réponse contenant la liste des symptômes extraits
+message SymptomAnalysisResponse {
+  repeated Symptom symptoms = 1;
+}
