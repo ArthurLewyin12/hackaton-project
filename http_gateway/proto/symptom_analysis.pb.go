@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.28.1
 // 	protoc        v6.31.1
-// source: proto/symptom_analysis.proto
+// source: symptom_analysis.proto
 
 package proto
 
@@ -20,19 +20,20 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Message de requête contenant le texte brut de l'utilisateur
+// Message de requête contenant le texte brut de l'utilisateur ou le contenu audio
 type SymptomAnalysisRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Text string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Text         string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`                                     // Texte brut (pour compatibilité ou saisie directe)
+	AudioContent []byte `protobuf:"bytes,2,opt,name=audio_content,json=audioContent,proto3" json:"audio_content,omitempty"` // Contenu audio de la voix de l'utilisateur
 }
 
 func (x *SymptomAnalysisRequest) Reset() {
 	*x = SymptomAnalysisRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_symptom_analysis_proto_msgTypes[0]
+		mi := &file_symptom_analysis_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -45,7 +46,7 @@ func (x *SymptomAnalysisRequest) String() string {
 func (*SymptomAnalysisRequest) ProtoMessage() {}
 
 func (x *SymptomAnalysisRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_symptom_analysis_proto_msgTypes[0]
+	mi := &file_symptom_analysis_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +59,7 @@ func (x *SymptomAnalysisRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SymptomAnalysisRequest.ProtoReflect.Descriptor instead.
 func (*SymptomAnalysisRequest) Descriptor() ([]byte, []int) {
-	return file_proto_symptom_analysis_proto_rawDescGZIP(), []int{0}
+	return file_symptom_analysis_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SymptomAnalysisRequest) GetText() string {
@@ -68,21 +69,30 @@ func (x *SymptomAnalysisRequest) GetText() string {
 	return ""
 }
 
+func (x *SymptomAnalysisRequest) GetAudioContent() []byte {
+	if x != nil {
+		return x.AudioContent
+	}
+	return nil
+}
+
 // Représentation structurée d'un symptôme identifié
 type Symptom struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Name      string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`           // Ex: "mal de tête", "fièvre"
-	Duration  string `protobuf:"bytes,2,opt,name=duration,proto3" json:"duration,omitempty"`   // Ex: "3 jours", "ce matin"
-	Intensity string `protobuf:"bytes,3,opt,name=intensity,proto3" json:"intensity,omitempty"` // Ex: "aigu", "léger"
+	Name         string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                     // Ex: "mal de tête", "fièvre"
+	Duration     string `protobuf:"bytes,2,opt,name=duration,proto3" json:"duration,omitempty"`                             // Ex: "3 jours", "ce matin"
+	Intensity    string `protobuf:"bytes,3,opt,name=intensity,proto3" json:"intensity,omitempty"`                           // Ex: "aigu", "léger"
+	OriginalText string `protobuf:"bytes,4,opt,name=original_text,json=originalText,proto3" json:"original_text,omitempty"` // Le segment de texte d'où le symptôme a été extrait
+	Negated      bool   `protobuf:"varint,5,opt,name=negated,proto3" json:"negated,omitempty"`                              // VRAI si l'utilisateur a nié ce symptôme (ex: "pas de fièvre")
 }
 
 func (x *Symptom) Reset() {
 	*x = Symptom{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_symptom_analysis_proto_msgTypes[1]
+		mi := &file_symptom_analysis_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -95,7 +105,7 @@ func (x *Symptom) String() string {
 func (*Symptom) ProtoMessage() {}
 
 func (x *Symptom) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_symptom_analysis_proto_msgTypes[1]
+	mi := &file_symptom_analysis_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -108,7 +118,7 @@ func (x *Symptom) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Symptom.ProtoReflect.Descriptor instead.
 func (*Symptom) Descriptor() ([]byte, []int) {
-	return file_proto_symptom_analysis_proto_rawDescGZIP(), []int{1}
+	return file_symptom_analysis_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Symptom) GetName() string {
@@ -132,19 +142,35 @@ func (x *Symptom) GetIntensity() string {
 	return ""
 }
 
-// Message de réponse contenant la liste des symptômes extraits
+func (x *Symptom) GetOriginalText() string {
+	if x != nil {
+		return x.OriginalText
+	}
+	return ""
+}
+
+func (x *Symptom) GetNegated() bool {
+	if x != nil {
+		return x.Negated
+	}
+	return false
+}
+
+// Message de réponse contenant la liste des symptômes extraits, le texte transcrit et la réponse audio
 type SymptomAnalysisResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Symptoms []*Symptom `protobuf:"bytes,1,rep,name=symptoms,proto3" json:"symptoms,omitempty"`
+	Symptoms        []*Symptom `protobuf:"bytes,1,rep,name=symptoms,proto3" json:"symptoms,omitempty"`
+	AudioResponse   []byte     `protobuf:"bytes,2,opt,name=audio_response,json=audioResponse,proto3" json:"audio_response,omitempty"`       // Réponse audio générée (TTS)
+	TranscribedText string     `protobuf:"bytes,3,opt,name=transcribed_text,json=transcribedText,proto3" json:"transcribed_text,omitempty"` // Texte transcrit à partir de audio_content
 }
 
 func (x *SymptomAnalysisResponse) Reset() {
 	*x = SymptomAnalysisResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_symptom_analysis_proto_msgTypes[2]
+		mi := &file_symptom_analysis_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -157,7 +183,7 @@ func (x *SymptomAnalysisResponse) String() string {
 func (*SymptomAnalysisResponse) ProtoMessage() {}
 
 func (x *SymptomAnalysisResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_symptom_analysis_proto_msgTypes[2]
+	mi := &file_symptom_analysis_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -170,7 +196,7 @@ func (x *SymptomAnalysisResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SymptomAnalysisResponse.ProtoReflect.Descriptor instead.
 func (*SymptomAnalysisResponse) Descriptor() ([]byte, []int) {
-	return file_proto_symptom_analysis_proto_rawDescGZIP(), []int{2}
+	return file_symptom_analysis_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SymptomAnalysisResponse) GetSymptoms() []*Symptom {
@@ -180,54 +206,79 @@ func (x *SymptomAnalysisResponse) GetSymptoms() []*Symptom {
 	return nil
 }
 
-var File_proto_symptom_analysis_proto protoreflect.FileDescriptor
+func (x *SymptomAnalysisResponse) GetAudioResponse() []byte {
+	if x != nil {
+		return x.AudioResponse
+	}
+	return nil
+}
 
-var file_proto_symptom_analysis_proto_rawDesc = []byte{
-	0x0a, 0x1c, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x73, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x5f,
-	0x61, 0x6e, 0x61, 0x6c, 0x79, 0x73, 0x69, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x2c, 0x0a, 0x16, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d,
-	0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73, 0x69, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
-	0x12, 0x0a, 0x04, 0x74, 0x65, 0x78, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74,
-	0x65, 0x78, 0x74, 0x22, 0x57, 0x0a, 0x07, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x12, 0x12,
+func (x *SymptomAnalysisResponse) GetTranscribedText() string {
+	if x != nil {
+		return x.TranscribedText
+	}
+	return ""
+}
+
+var File_symptom_analysis_proto protoreflect.FileDescriptor
+
+var file_symptom_analysis_proto_rawDesc = []byte{
+	0x0a, 0x16, 0x73, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x5f, 0x61, 0x6e, 0x61, 0x6c, 0x79, 0x73,
+	0x69, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22,
+	0x51, 0x0a, 0x16, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73,
+	0x69, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x65, 0x78,
+	0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74, 0x65, 0x78, 0x74, 0x12, 0x23, 0x0a,
+	0x0d, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x5f, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0c, 0x52, 0x0c, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x43, 0x6f, 0x6e, 0x74, 0x65,
+	0x6e, 0x74, 0x22, 0x96, 0x01, 0x0a, 0x07, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x12, 0x12,
 	0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61,
 	0x6d, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x64, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x02,
 	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x64, 0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1c,
 	0x0a, 0x09, 0x69, 0x6e, 0x74, 0x65, 0x6e, 0x73, 0x69, 0x74, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x09, 0x69, 0x6e, 0x74, 0x65, 0x6e, 0x73, 0x69, 0x74, 0x79, 0x22, 0x45, 0x0a, 0x17,
+	0x09, 0x52, 0x09, 0x69, 0x6e, 0x74, 0x65, 0x6e, 0x73, 0x69, 0x74, 0x79, 0x12, 0x23, 0x0a, 0x0d,
+	0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x61, 0x6c, 0x5f, 0x74, 0x65, 0x78, 0x74, 0x18, 0x04, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0c, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x61, 0x6c, 0x54, 0x65, 0x78,
+	0x74, 0x12, 0x18, 0x0a, 0x07, 0x6e, 0x65, 0x67, 0x61, 0x74, 0x65, 0x64, 0x18, 0x05, 0x20, 0x01,
+	0x28, 0x08, 0x52, 0x07, 0x6e, 0x65, 0x67, 0x61, 0x74, 0x65, 0x64, 0x22, 0x97, 0x01, 0x0a, 0x17,
 	0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73, 0x69, 0x73, 0x52,
 	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2a, 0x0a, 0x08, 0x73, 0x79, 0x6d, 0x70, 0x74,
 	0x6f, 0x6d, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74,
 	0x6f, 0x2e, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x52, 0x08, 0x73, 0x79, 0x6d, 0x70, 0x74,
-	0x6f, 0x6d, 0x73, 0x32, 0x64, 0x0a, 0x16, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x41, 0x6e,
-	0x61, 0x6c, 0x79, 0x73, 0x69, 0x73, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x4a, 0x0a,
-	0x07, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x7a, 0x65, 0x12, 0x1d, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x2e, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73, 0x69, 0x73,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e,
-	0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73, 0x69, 0x73, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x17, 0x5a, 0x15, 0x67, 0x65, 0x6d,
-	0x69, 0x6e, 0x69, 0x5f, 0x61, 0x70, 0x69, 0x5f, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x6f, 0x6d, 0x73, 0x12, 0x25, 0x0a, 0x0e, 0x61, 0x75, 0x64, 0x69, 0x6f, 0x5f, 0x72, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0d, 0x61, 0x75, 0x64,
+	0x69, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x29, 0x0a, 0x10, 0x74, 0x72,
+	0x61, 0x6e, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x64, 0x5f, 0x74, 0x65, 0x78, 0x74, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65,
+	0x64, 0x54, 0x65, 0x78, 0x74, 0x32, 0x64, 0x0a, 0x16, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d,
+	0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73, 0x69, 0x73, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12,
+	0x4a, 0x0a, 0x07, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x7a, 0x65, 0x12, 0x1d, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x2e, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73,
+	0x69, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1e, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x2e, 0x53, 0x79, 0x6d, 0x70, 0x74, 0x6f, 0x6d, 0x41, 0x6e, 0x61, 0x6c, 0x79, 0x73, 0x69,
+	0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x17, 0x5a, 0x15, 0x67,
+	0x65, 0x6d, 0x69, 0x6e, 0x69, 0x5f, 0x61, 0x70, 0x69, 0x5f, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
-	file_proto_symptom_analysis_proto_rawDescOnce sync.Once
-	file_proto_symptom_analysis_proto_rawDescData = file_proto_symptom_analysis_proto_rawDesc
+	file_symptom_analysis_proto_rawDescOnce sync.Once
+	file_symptom_analysis_proto_rawDescData = file_symptom_analysis_proto_rawDesc
 )
 
-func file_proto_symptom_analysis_proto_rawDescGZIP() []byte {
-	file_proto_symptom_analysis_proto_rawDescOnce.Do(func() {
-		file_proto_symptom_analysis_proto_rawDescData = protoimpl.X.CompressGZIP(file_proto_symptom_analysis_proto_rawDescData)
+func file_symptom_analysis_proto_rawDescGZIP() []byte {
+	file_symptom_analysis_proto_rawDescOnce.Do(func() {
+		file_symptom_analysis_proto_rawDescData = protoimpl.X.CompressGZIP(file_symptom_analysis_proto_rawDescData)
 	})
-	return file_proto_symptom_analysis_proto_rawDescData
+	return file_symptom_analysis_proto_rawDescData
 }
 
-var file_proto_symptom_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_proto_symptom_analysis_proto_goTypes = []interface{}{
+var file_symptom_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_symptom_analysis_proto_goTypes = []interface{}{
 	(*SymptomAnalysisRequest)(nil),  // 0: proto.SymptomAnalysisRequest
 	(*Symptom)(nil),                 // 1: proto.Symptom
 	(*SymptomAnalysisResponse)(nil), // 2: proto.SymptomAnalysisResponse
 }
-var file_proto_symptom_analysis_proto_depIdxs = []int32{
+var file_symptom_analysis_proto_depIdxs = []int32{
 	1, // 0: proto.SymptomAnalysisResponse.symptoms:type_name -> proto.Symptom
 	0, // 1: proto.SymptomAnalysisService.Analyze:input_type -> proto.SymptomAnalysisRequest
 	2, // 2: proto.SymptomAnalysisService.Analyze:output_type -> proto.SymptomAnalysisResponse
@@ -238,13 +289,13 @@ var file_proto_symptom_analysis_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_proto_symptom_analysis_proto_init() }
-func file_proto_symptom_analysis_proto_init() {
-	if File_proto_symptom_analysis_proto != nil {
+func init() { file_symptom_analysis_proto_init() }
+func file_symptom_analysis_proto_init() {
+	if File_symptom_analysis_proto != nil {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_proto_symptom_analysis_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_symptom_analysis_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SymptomAnalysisRequest); i {
 			case 0:
 				return &v.state
@@ -256,7 +307,7 @@ func file_proto_symptom_analysis_proto_init() {
 				return nil
 			}
 		}
-		file_proto_symptom_analysis_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_symptom_analysis_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Symptom); i {
 			case 0:
 				return &v.state
@@ -268,7 +319,7 @@ func file_proto_symptom_analysis_proto_init() {
 				return nil
 			}
 		}
-		file_proto_symptom_analysis_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_symptom_analysis_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SymptomAnalysisResponse); i {
 			case 0:
 				return &v.state
@@ -285,18 +336,18 @@ func file_proto_symptom_analysis_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_proto_symptom_analysis_proto_rawDesc,
+			RawDescriptor: file_symptom_analysis_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_symptom_analysis_proto_goTypes,
-		DependencyIndexes: file_proto_symptom_analysis_proto_depIdxs,
-		MessageInfos:      file_proto_symptom_analysis_proto_msgTypes,
+		GoTypes:           file_symptom_analysis_proto_goTypes,
+		DependencyIndexes: file_symptom_analysis_proto_depIdxs,
+		MessageInfos:      file_symptom_analysis_proto_msgTypes,
 	}.Build()
-	File_proto_symptom_analysis_proto = out.File
-	file_proto_symptom_analysis_proto_rawDesc = nil
-	file_proto_symptom_analysis_proto_goTypes = nil
-	file_proto_symptom_analysis_proto_depIdxs = nil
+	File_symptom_analysis_proto = out.File
+	file_symptom_analysis_proto_rawDesc = nil
+	file_symptom_analysis_proto_goTypes = nil
+	file_symptom_analysis_proto_depIdxs = nil
 }

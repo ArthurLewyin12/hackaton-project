@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from . import symptom_analysis_pb2 as symptom__analysis__pb2
+from proto import symptom_analysis_pb2 as proto_dot_symptom__analysis__pb2
 
 GRPC_GENERATED_VERSION = '1.73.1'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in symptom_analysis_pb2_grpc.py depends on'
+        + f' but the generated code in proto/symptom_analysis_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -37,8 +37,8 @@ class SymptomAnalysisServiceStub(object):
         """
         self.Analyze = channel.unary_unary(
                 '/proto.SymptomAnalysisService/Analyze',
-                request_serializer=symptom__analysis__pb2.SymptomAnalysisRequest.SerializeToString,
-                response_deserializer=symptom__analysis__pb2.SymptomAnalysisResponse.FromString,
+                request_serializer=proto_dot_symptom__analysis__pb2.SymptomAnalysisRequest.SerializeToString,
+                response_deserializer=proto_dot_symptom__analysis__pb2.SymptomAnalysisResponse.FromString,
                 _registered_method=True)
 
 
@@ -58,8 +58,8 @@ def add_SymptomAnalysisServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Analyze': grpc.unary_unary_rpc_method_handler(
                     servicer.Analyze,
-                    request_deserializer=symptom__analysis__pb2.SymptomAnalysisRequest.FromString,
-                    response_serializer=symptom__analysis__pb2.SymptomAnalysisResponse.SerializeToString,
+                    request_deserializer=proto_dot_symptom__analysis__pb2.SymptomAnalysisRequest.FromString,
+                    response_serializer=proto_dot_symptom__analysis__pb2.SymptomAnalysisResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -88,8 +88,8 @@ class SymptomAnalysisService(object):
             request,
             target,
             '/proto.SymptomAnalysisService/Analyze',
-            symptom__analysis__pb2.SymptomAnalysisRequest.SerializeToString,
-            symptom__analysis__pb2.SymptomAnalysisResponse.FromString,
+            proto_dot_symptom__analysis__pb2.SymptomAnalysisRequest.SerializeToString,
+            proto_dot_symptom__analysis__pb2.SymptomAnalysisResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v6.31.1
-// source: proto/symptom_analysis.proto
+// source: symptom_analysis.proto
 
 package proto
 
@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SymptomAnalysisServiceClient interface {
-	// Méthode pour analyser le texte et extraire les symptômes
+	// Méthode pour analyser le texte/audio et extraire les symptômes
 	Analyze(ctx context.Context, in *SymptomAnalysisRequest, opts ...grpc.CallOption) (*SymptomAnalysisResponse, error)
 }
 
@@ -47,7 +47,7 @@ func (c *symptomAnalysisServiceClient) Analyze(ctx context.Context, in *SymptomA
 // All implementations must embed UnimplementedSymptomAnalysisServiceServer
 // for forward compatibility
 type SymptomAnalysisServiceServer interface {
-	// Méthode pour analyser le texte et extraire les symptômes
+	// Méthode pour analyser le texte/audio et extraire les symptômes
 	Analyze(context.Context, *SymptomAnalysisRequest) (*SymptomAnalysisResponse, error)
 	mustEmbedUnimplementedSymptomAnalysisServiceServer()
 }
@@ -104,5 +104,5 @@ var SymptomAnalysisService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/symptom_analysis.proto",
+	Metadata: "symptom_analysis.proto",
 }

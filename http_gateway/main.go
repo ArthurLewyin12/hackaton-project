@@ -4,51 +4,137 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-
-	"strings"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"google.golang.org/genai"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	// Importer le package proto généré
-	pb "gemini_api_test/http_gateway/proto"
 )
 
 // Structure pour la requête entrante de notre API
 type AskRequest struct {
-	Text string `json:"text"`
+	Text           string `json:"text"`
+	ConversationID string `json:"conversation_id,omitempty"`
 }
 
 // Structure pour la réponse de notre API
 type AskResponse struct {
-	Response string `json:"response"`
+	Response       string `json:"response"`
+	ConversationID string `json:"conversation_id"`
 }
 
-// Fonction pour appeler le service NLP via gRPC
-func callNlpService(text string) (*pb.SymptomAnalysisResponse, error) {
-	// Adresse du serveur gRPC Python
-	addr := "localhost:50051"
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, fmt.Errorf("impossible de se connecter au service NLP: %w", err)
+// Structure pour représenter un message dans l'historique
+type Message struct {
+	Role    string // "user" ou "model"
+	Content string
+}
+
+// Structure pour représenter une conversation
+type Conversation struct {
+	ID       string
+	Messages []Message
+	Created  time.Time
+	Updated  time.Time
+}
+
+// Stockage en mémoire des conversations
+var conversations = sync.Map{}
+
+// Prompt système pour définir le comportement de l'IA
+const systemPromptText = `Bonjour Chat, Je suis le Professeur SymptoAI Agrégé et Urgentiste, Professeur à la Faculté de Médecine Générale Avancée, et j'ai traité un cas pratique avec mes étudiants, déjà corrigé, je veux que tu lises exactement ce que dit le patient, ça constitue l'énoncé du sujet, puis tu poses 3 questions ciblées, ensuite il répond et après ça, tu ne fais Aucun Commentaire, Tu fournis Un corrigé Clair sous forme de 3 blocs textuels:
+
+Bloc 1 : Diagnostic le Plus Probable et à Combien de % Exactement
+Bloc 2 : Prescription Médicale adaptée précise avec le moins de médicament et le plus d'efficacité + Posologie exacte
+Bloc 3 : Niveau d'urgence Avec code couleurs VERT JAUNE ORANGE ROUGE
+
+Instructions strictes :
+- Première interaction : Lis le cas du patient puis pose EXACTEMENT 3 questions ciblées
+- Après les réponses du patient : Fournis UNIQUEMENT les 3 blocs sans aucun commentaire supplémentaire
+- Sois précis dans les pourcentages de diagnostic
+- Donne des prescriptions médicales concrètes avec posologies exactes
+- Assigne un code couleur d'urgence approprié
+
+Reste dans ce rôle de Professeur SymptoAI tout au long de la conversation.`
+
+// Fonction pour récupérer ou créer une conversation
+func getOrCreateConversation(conversationID string) *Conversation {
+	if conversationID != "" {
+		if conv, exists := conversations.Load(conversationID); exists {
+			conversation := conv.(*Conversation)
+			conversation.Updated = time.Now()
+			return conversation
+		}
 	}
-	defer conn.Close()
 
-	c := pb.NewSymptomAnalysisServiceClient(conn)
+	// Créer une nouvelle conversation
+	newID := uuid.New().String()
+	conversation := &Conversation{
+		ID:       newID,
+		Messages: []Message{},
+		Created:  time.Now(),
+		Updated:  time.Now(),
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
+	conversations.Store(newID, conversation)
+	return conversation
+}
 
-	req := &pb.SymptomAnalysisRequest{Text: text}
-	log.Printf("Envoi de la requête gRPC au service NLP: %v", req)
+// Fonction pour construire l'historique complet pour l'API Gemini
+func buildConversationHistory(conversation *Conversation, newUserMessage string) []*genai.Content {
+	var contents []*genai.Content
 
-	return c.Analyze(ctx, req)
+	// Construire le contenu complet pour la génération
+	var fullPrompt string
+
+	// Ajouter le prompt système en premier (seulement si c'est le début de la conversation)
+	if len(conversation.Messages) == 0 {
+		fullPrompt = systemPromptText + "\n\nCas patient: " + newUserMessage
+	} else {
+		// Reconstruire l'historique complet
+		fullPrompt = systemPromptText + "\n\n"
+
+		for i, msg := range conversation.Messages {
+			if msg.Role == "user" {
+				if i == 0 {
+					fullPrompt += "Cas patient: " + msg.Content + "\n\n"
+				} else {
+					fullPrompt += "Réponses patient: " + msg.Content + "\n\n"
+				}
+			} else if msg.Role == "model" {
+				fullPrompt += "Professeur SymptoAI: " + msg.Content + "\n\n"
+			}
+		}
+
+		// Ajouter le nouveau message
+		fullPrompt += "Réponses patient: " + newUserMessage
+	}
+
+	// Créer le contenu pour l'API
+	content := &genai.Content{
+		Parts: []genai.Part{
+			genai.Text(fullPrompt),
+		},
+	}
+
+	contents = append(contents, content)
+	return contents
+}
+
+// Fonction pour sauvegarder les messages dans la conversation
+func saveMessagesToConversation(conversation *Conversation, userMessage, modelResponse string) {
+	conversation.Messages = append(conversation.Messages, Message{
+		Role:    "user",
+		Content: userMessage,
+	})
+	conversation.Messages = append(conversation.Messages, Message{
+		Role:    "model",
+		Content: modelResponse,
+	})
+	conversation.Updated = time.Now()
+	conversations.Store(conversation.ID, conversation)
 }
 
 func askHandler(w http.ResponseWriter, r *http.Request) {
@@ -59,23 +145,19 @@ func askHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Appeler le service NLP pour l'analyse de symptômes
-	nlpResponse, err := callNlpService(req.Text)
-	if err != nil {
-		log.Printf("Erreur lors de l'appel au service NLP: %v", err)
-		http.Error(w, "Erreur interne lors de l'analyse des symptômes", http.StatusInternalServerError)
+	if req.Text == "" {
+		http.Error(w, "Le champ 'text' est obligatoire", http.StatusBadRequest)
 		return
 	}
-	log.Printf("Réponse reçue du service NLP: %v", nlpResponse)
 
-	// 3. Construire un prompt intelligent pour Gemini
-	var symptoms []string
-	for _, s := range nlpResponse.Symptoms {
-		symptoms = append(symptoms, fmt.Sprintf("- %s (intensité: %s, durée: %s)", s.Name, s.Intensity, s.Duration))
-	}
-	promptText := fmt.Sprintf("Un patient décrit les symptômes suivants:\n%s\n\nRédige des conseils de premiers soins clairs et sécuritaires. Mentionne explicitement quand il est impératif de consulter un médecin.", strings.Join(symptoms, "\n"))
+	// 2. Récupérer ou créer la conversation
+	conversation := getOrCreateConversation(req.ConversationID)
+	log.Printf("Traitement de la requête pour la conversation %s", conversation.ID)
 
-	// 4. Appeler l'API Gemini avec le prompt enrichi
+	// 3. Construire l'historique complet pour l'API
+	conversationContents := buildConversationHistory(conversation, req.Text)
+
+	// 4. Appeler l'API Gemini
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, nil)
 	if err != nil {
@@ -84,17 +166,68 @@ func askHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := client.Models.GenerateContent(ctx, "gemini-1.5-flash", genai.Text(promptText), nil)
+	// Utiliser GenerateContent avec l'historique complet
+	result, err := client.Models.GenerateContent(ctx, "gemini-1.5-flash", conversationContents, nil)
 	if err != nil {
 		log.Printf("Erreur lors de la génération de contenu: %v", err)
 		http.Error(w, "Erreur lors de la génération de la réponse", http.StatusInternalServerError)
 		return
 	}
 
-	// 5. Renvoyer la réponse finale
-	response := AskResponse{Response: result.Text()}
+	if result == nil || result.Text() == "" {
+		log.Printf("Réponse vide reçue de l'API Gemini")
+		http.Error(w, "Aucune réponse générée par l'IA", http.StatusInternalServerError)
+		return
+	}
+
+	responseText := result.Text()
+
+	// 5. Sauvegarder les messages dans la conversation
+	saveMessagesToConversation(conversation, req.Text, responseText)
+
+	// 6. Renvoyer la réponse finale avec l'ID de conversation
+	response := AskResponse{
+		Response:       responseText,
+		ConversationID: conversation.ID,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Erreur lors de l'encodage JSON: %v", err)
+		http.Error(w, "Erreur lors de la préparation de la réponse", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Réponse envoyée pour la conversation %s", conversation.ID)
+}
+
+// Endpoint pour récupérer l'historique d'une conversation (optionnel, utile pour le debug)
+func conversationHandler(w http.ResponseWriter, r *http.Request) {
+	conversationID := r.URL.Query().Get("id")
+	if conversationID == "" {
+		http.Error(w, "Paramètre 'id' manquant", http.StatusBadRequest)
+		return
+	}
+
+	if conv, exists := conversations.Load(conversationID); exists {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(conv)
+	} else {
+		http.Error(w, "Conversation non trouvée", http.StatusNotFound)
+	}
+}
+
+// Endpoint pour lister toutes les conversations (optionnel, utile pour le debug)
+func conversationsHandler(w http.ResponseWriter, r *http.Request) {
+	var allConversations []*Conversation
+	conversations.Range(func(key, value interface{}) bool {
+		conv := value.(*Conversation)
+		allConversations = append(allConversations, conv)
+		return true
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(allConversations)
 }
 
 func main() {
@@ -103,9 +236,20 @@ func main() {
 		log.Println("Attention: Fichier .env non trouvé.")
 	}
 
+	// Routes principales
 	http.HandleFunc("/api/ask", askHandler)
+
+	// Routes utiles pour le développement et le debug
+	http.HandleFunc("/api/conversation", conversationHandler)
+	http.HandleFunc("/api/conversations", conversationsHandler)
+
 	port := "8081"
-	log.Printf("Passerelle HTTP démarrée sur http://localhost:%s", port)
+	log.Printf("Passerelle HTTP conversationnelle démarrée sur http://localhost:%s", port)
+	log.Println("Endpoints disponibles:")
+	log.Println("  POST /api/ask - Envoyer un message")
+	log.Println("  GET /api/conversation?id=<conversation_id> - Récupérer une conversation")
+	log.Println("  GET /api/conversations - Lister toutes les conversations")
+
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatalf("Erreur lors du démarrage du serveur HTTP: %v", err)
 	}

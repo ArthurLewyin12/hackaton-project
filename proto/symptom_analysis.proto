@@ -4,15 +4,16 @@ package proto;
 
 option go_package = "gemini_api_test/proto";
 
-// Le service qui analyse le texte des symptômes
+// Le service qui analyse le texte des symptômes et gère la voix
 service SymptomAnalysisService {
-  // Méthode pour analyser le texte et extraire les symptômes
+  // Méthode pour analyser le texte/audio et extraire les symptômes
   rpc Analyze(SymptomAnalysisRequest) returns (SymptomAnalysisResponse) {}
 }
 
-// Message de requête contenant le texte brut de l'utilisateur
+// Message de requête contenant le texte brut de l'utilisateur ou le contenu audio
 message SymptomAnalysisRequest {
-  string text = 1;
+  string text = 1; // Texte brut (pour compatibilité ou saisie directe)
+  bytes audio_content = 2; // Contenu audio de la voix de l'utilisateur
 }
 
 // Représentation structurée d'un symptôme identifié
@@ -20,9 +21,13 @@ message Symptom {
   string name = 1;        // Ex: "mal de tête", "fièvre"
   string duration = 2;    // Ex: "3 jours", "ce matin"
   string intensity = 3;   // Ex: "aigu", "léger"
+  string original_text = 4; // Le segment de texte d'où le symptôme a été extrait
+  bool negated = 5; // VRAI si l'utilisateur a nié ce symptôme (ex: "pas de fièvre")
 }
 
-// Message de réponse contenant la liste des symptômes extraits
+// Message de réponse contenant la liste des symptômes extraits, le texte transcrit et la réponse audio
 message SymptomAnalysisResponse {
   repeated Symptom symptoms = 1;
+  bytes audio_response = 2; // Réponse audio générée (TTS)
+  string transcribed_text = 3; // Texte transcrit à partir de audio_content
 }

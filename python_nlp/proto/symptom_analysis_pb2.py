@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16symptom_analysis.proto\x12\x05proto\"&\n\x16SymptomAnalysisRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\"<\n\x07Symptom\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08\x64uration\x18\x02 \x01(\t\x12\x11\n\tintensity\x18\x03 \x01(\t\";\n\x17SymptomAnalysisResponse\x12 \n\x08symptoms\x18\x01 \x03(\x0b\x32\x0e.proto.Symptom2d\n\x16SymptomAnalysisService\x12J\n\x07\x41nalyze\x12\x1d.proto.SymptomAnalysisRequest\x1a\x1e.proto.SymptomAnalysisResponse\"\x00\x42\x17Z\x15gemini_api_test/protob\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16symptom_analysis.proto\x12\x05proto\"=\n\x16SymptomAnalysisRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x15\n\raudio_content\x18\x02 \x01(\x0c\"d\n\x07Symptom\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08\x64uration\x18\x02 \x01(\t\x12\x11\n\tintensity\x18\x03 \x01(\t\x12\x15\n\roriginal_text\x18\x04 \x01(\t\x12\x0f\n\x07negated\x18\x05 \x01(\x08\"m\n\x17SymptomAnalysisResponse\x12 \n\x08symptoms\x18\x01 \x03(\x0b\x32\x0e.proto.Symptom\x12\x16\n\x0e\x61udio_response\x18\x02 \x01(\x0c\x12\x18\n\x10transcribed_text\x18\x03 \x01(\t2d\n\x16SymptomAnalysisService\x12J\n\x07\x41nalyze\x12\x1d.proto.SymptomAnalysisRequest\x1a\x1e.proto.SymptomAnalysisResponse\"\x00\x42\x17Z\x15gemini_api_test/protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,11 +33,11 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z\025gemini_api_test/proto'
   _globals['_SYMPTOMANALYSISREQUEST']._serialized_start=33
-  _globals['_SYMPTOMANALYSISREQUEST']._serialized_end=71
-  _globals['_SYMPTOM']._serialized_start=73
-  _globals['_SYMPTOM']._serialized_end=133
-  _globals['_SYMPTOMANALYSISRESPONSE']._serialized_start=135
-  _globals['_SYMPTOMANALYSISRESPONSE']._serialized_end=194
-  _globals['_SYMPTOMANALYSISSERVICE']._serialized_start=196
-  _globals['_SYMPTOMANALYSISSERVICE']._serialized_end=296
+  _globals['_SYMPTOMANALYSISREQUEST']._serialized_end=94
+  _globals['_SYMPTOM']._serialized_start=96
+  _globals['_SYMPTOM']._serialized_end=196
+  _globals['_SYMPTOMANALYSISRESPONSE']._serialized_start=198
+  _globals['_SYMPTOMANALYSISRESPONSE']._serialized_end=307
+  _globals['_SYMPTOMANALYSISSERVICE']._serialized_start=309
+  _globals['_SYMPTOMANALYSISSERVICE']._serialized_end=409
 # @@protoc_insertion_point(module_scope)
