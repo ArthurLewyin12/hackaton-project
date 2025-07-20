@@ -2,90 +2,111 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
-	"io"
+	"fmt"
 	"log"
 	"net/http"
+
+	"strings"
+	"time"
+
+	"github.com/joho/godotenv"
+	"google.golang.org/genai"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	// Importer le package proto généré
+	pb "gemini_api_test/http_gateway/proto"
 )
 
-// Structure pour la requête entrante sur notre serveur HTTP
+// Structure pour la requête entrante de notre API
 type AskRequest struct {
 	Text string `json:"text"`
 }
 
-// Structures pour construire la requête JSON-RPC
-type MCPParams struct {
-	Name      string      `json:"name"`
-	Arguments interface{} `json:"arguments"`
+// Structure pour la réponse de notre API
+type AskResponse struct {
+	Response string `json:"response"`
 }
 
-type MCPRequest struct {
-	JsonRPC string      `json:"jsonrpc"`
-	ID      int         `json:"id"`
-	Method  string      `json:"method"`
-	Params  MCPParams   `json:"params"`
+// Fonction pour appeler le service NLP via gRPC
+func callNlpService(text string) (*pb.SymptomAnalysisResponse, error) {
+	// Adresse du serveur gRPC Python
+	addr := "localhost:50051"
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("impossible de se connecter au service NLP: %w", err)
+	}
+	defer conn.Close()
+
+	c := pb.NewSymptomAnalysisServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	req := &pb.SymptomAnalysisRequest{Text: text}
+	log.Printf("Envoi de la requête gRPC au service NLP: %v", req)
+
+	return c.Analyze(ctx, req)
 }
 
 func askHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. Lire le corps de la requête HTTP
-	body, err := io.ReadAll(r.Body)
+	// 1. Lire et parser la requête de l'utilisateur
+	var req AskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Requête JSON invalide", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Appeler le service NLP pour l'analyse de symptômes
+	nlpResponse, err := callNlpService(req.Text)
 	if err != nil {
-		http.Error(w, "Erreur de lecture de la requête", http.StatusBadRequest)
+		log.Printf("Erreur lors de l'appel au service NLP: %v", err)
+		http.Error(w, "Erreur interne lors de l'analyse des symptômes", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Réponse reçue du service NLP: %v", nlpResponse)
 
-	// 2. Désérialiser le JSON de la requête
-	var askReq AskRequest
-	if err := json.Unmarshal(body, &askReq); err != nil {
-		http.Error(w, "JSON invalide", http.StatusBadRequest)
-		return
+	// 3. Construire un prompt intelligent pour Gemini
+	var symptoms []string
+	for _, s := range nlpResponse.Symptoms {
+		symptoms = append(symptoms, fmt.Sprintf("- %s (intensité: %s, durée: %s)", s.Name, s.Intensity, s.Duration))
 	}
+	promptText := fmt.Sprintf("Un patient décrit les symptômes suivants:\n%s\n\nRédige des conseils de premiers soins clairs et sécuritaires. Mentionne explicitement quand il est impératif de consulter un médecin.", strings.Join(symptoms, "\n"))
 
-	// 3. Construire la requête JSON-RPC complète, comme dans la doc
-	mcpReq := MCPRequest{
-		JsonRPC: "2.0",
-		ID:      1,
-		Method:  "tools/call",
-		Params: MCPParams{
-			Name:      "analyzeSymptoms",
-			Arguments: map[string]string{"text": askReq.Text},
-		},
-	}
-	mcpBodyBytes, err := json.Marshal(mcpReq)
+	// 4. Appeler l'API Gemini avec le prompt enrichi
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, nil)
 	if err != nil {
-		http.Error(w, "Erreur de sérialisation MCP", http.StatusInternalServerError)
+		log.Printf("Erreur lors de la création du client GenAI: %v", err)
+		http.Error(w, "Erreur de communication avec le service d'IA", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Envoi de la requête à http://localhost:8090/mcp/tools/call: %s", string(mcpBodyBytes))
-
-	// 4. Appeler le bon point de terminaison du serveur MCP
-	resp, err := http.Post("http://localhost:8090/mcp/tools/call", "application/json", bytes.NewBuffer(mcpBodyBytes))
+	result, err := client.Models.GenerateContent(ctx, "gemini-1.5-flash", genai.Text(promptText), nil)
 	if err != nil {
-		http.Error(w, "Erreur lors de l'appel au serveur MCP: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	// 5. Lire la réponse du serveur MCP
-	mcpResponse, err := io.ReadAll(resp.Body)
-	if err != nil {
-		http.Error(w, "Erreur de lecture de la réponse MCP", http.StatusInternalServerError)
+		log.Printf("Erreur lors de la génération de contenu: %v", err)
+		http.Error(w, "Erreur lors de la génération de la réponse", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Réponse reçue du MCP : %s", string(mcpResponse))
-
-	// 6. Renvoyer la réponse du MCP au client final
+	// 5. Renvoyer la réponse finale
+	response := AskResponse{Response: result.Text()}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(mcpResponse)
+	json.NewEncoder(w).Encode(response)
 }
 
 func main() {
+	// Charger les variables d'environnement
+	if err := godotenv.Load(); err != nil {
+		log.Println("Attention: Fichier .env non trouvé.")
+	}
+
 	http.HandleFunc("/api/ask", askHandler)
-	log.Println("Passerelle HTTP démarrée sur http://localhost:8081")
-	if err := http.ListenAndServe(":8081", nil); err != nil {
+	port := "8081"
+	log.Printf("Passerelle HTTP démarrée sur http://localhost:%s", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatalf("Erreur lors du démarrage du serveur HTTP: %v", err)
 	}
 }
