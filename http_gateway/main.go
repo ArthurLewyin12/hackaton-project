@@ -82,7 +82,6 @@ func getOrCreateConversation(conversationID string) *Conversation {
 	return conversation
 }
 
-// Fonction pour construire l'historique complet pour l'API Gemini
 func buildConversationHistory(conversation *Conversation, newUserMessage string) []*genai.Content {
 	var contents []*genai.Content
 
@@ -112,14 +111,10 @@ func buildConversationHistory(conversation *Conversation, newUserMessage string)
 		fullPrompt += "Réponses patient: " + newUserMessage
 	}
 
-	// Créer le contenu pour l'API
-	content := &genai.Content{
-		Parts: []genai.Part{
-			genai.Text(fullPrompt),
-		},
-	}
+	// SOLUTION CORRIGÉE ICI:
+	// Utilisez directement genai.Text() qui retourne déjà un []*genai.Content
+	contents = genai.Text(fullPrompt)
 
-	contents = append(contents, content)
 	return contents
 }
 
